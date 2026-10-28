@@ -19,12 +19,14 @@ const BILL_RATE_PER_KL = 10;
 // MIDDLEWARE
 // ===============================
 
+app.set("trust proxy", 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "aquatrack-development-secret",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -36,14 +38,12 @@ app.use(
   })
 );
 
-app.use(express.static(path.join(__dirname, "public")));
-
 // ===============================
 // AUTHENTICATION MIDDLEWARE
 // ===============================
 
 function requireLogin(req, res, next) {
-  if (!req.session.userId) {
+  if (!req.session || !req.session.userId) {
     return res.status(401).json({
       message: "Please sign in first."
     });
@@ -51,6 +51,29 @@ function requireLogin(req, res, next) {
 
   next();
 }
+
+// ===============================
+// HOME PAGE
+// ===============================
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ===============================
+// PROTECTED DASHBOARD
+// ===============================
+
+app.get("/dashboard.html", (req, res) => {
+  if (!req.session || !req.session.userId) {
+    return res.redirect("/");
+  }
+
+  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+});
+
+// Serve other public files, such as CSS and JavaScript.
+app.use(express.static(path.join(__dirname, "public")));
 
 // ===============================
 // SIGN UP
@@ -64,6 +87,7 @@ app.post("/api/auth/signup", async (req, res) => {
       typeof name !== "string" ||
       !name.trim() ||
       typeof email !== "string" ||
+      !email.trim() ||
       typeof password !== "string"
     ) {
       return res.status(400).json({
@@ -99,12 +123,28 @@ app.post("/api/auth/signup", async (req, res) => {
 
     req.session.userId = user._id.toString();
 
-    res.status(201).json({
-      message: "Account created successfully.",
-      name: user.name
+    req.session.save((error) => {
+      if (error) {
+        console.error("Signup session error:", error);
+
+        return res.status(500).json({
+          message: "Account created, but unable to start your session. Please log in."
+        });
+      }
+
+      res.status(201).json({
+        message: "Account created successfully.",
+        name: user.name
+      });
     });
   } catch (error) {
     console.error("Signup error:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Email already registered."
+      });
+    }
 
     res.status(500).json({
       message: "Unable to create account."
@@ -122,7 +162,9 @@ app.post("/api/auth/login", async (req, res) => {
 
     if (
       typeof email !== "string" ||
-      typeof password !== "string"
+      typeof password !== "string" ||
+      !email.trim() ||
+      !password
     ) {
       return res.status(400).json({
         message: "Please enter email and password."
@@ -144,7 +186,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     req.session.regenerate((error) => {
       if (error) {
-        console.error("Session error:", error);
+        console.error("Session regeneration error:", error);
 
         return res.status(500).json({
           message: "Unable to create login session."
@@ -187,6 +229,8 @@ app.get("/api/auth/me", requireLogin, async (req, res) => {
       .select("name email");
 
     if (!user) {
+      req.session.destroy(() => {});
+
       return res.status(401).json({
         message: "User not found. Please sign in again."
       });
@@ -216,7 +260,11 @@ app.post("/api/auth/logout", (req, res) => {
       });
     }
 
-    res.clearCookie("connect.sid");
+    res.clearCookie("connect.sid", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production"
+    });
 
     res.json({
       message: "Logged out successfully."
@@ -253,9 +301,22 @@ app.post("/api/usages", requireLogin, async (req, res) => {
       });
     }
 
-    const usageDate = date
-      ? new Date(`${date}T00:00:00`)
-      : new Date();
+    let usageDate;
+
+    if (date) {
+      if (
+        typeof date !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date)
+      ) {
+        return res.status(400).json({
+          message: "Please select a valid date."
+        });
+      }
+
+      usageDate = new Date(`${date}T00:00:00`);
+    } else {
+      usageDate = new Date();
+    }
 
     if (Number.isNaN(usageDate.getTime())) {
       return res.status(400).json({
@@ -358,120 +419,106 @@ app.delete("/api/usages/:id", requireLogin, async (req, res) => {
 // GENERATE AND SAVE MONTHLY BILL
 // ===============================
 
-app.post(
-  "/api/bills/generate",
-  requireLogin,
-  async (req, res) => {
-    try {
-      const { billingMonth } = req.body;
+app.post("/api/bills/generate", requireLogin, async (req, res) => {
+  try {
+    const { billingMonth } = req.body;
 
-      if (
-        typeof billingMonth !== "string" ||
-        !/^\d{4}-(0[1-9]|1[0-2])$/.test(billingMonth)
-      ) {
-        return res.status(400).json({
-          message: "Please select a valid billing month."
-        });
-      }
-
-      const [year, month] = billingMonth
-        .split("-")
-        .map(Number);
-
-      // Use the selected calendar month.
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 1);
-
-      // Find usage records belonging to this logged-in user.
-      const usages = await Usage.find({
-        userId: req.session.userId,
-        date: {
-          $gte: startDate,
-          $lt: endDate
-        }
-      });
-
-      // Calculate total water consumption.
-      const totalLiters = usages.reduce(
-        (sum, usage) => sum + Number(usage.liters || 0),
-        0
-      );
-
-      // Demo rate: ₹10 per 1,000 litres.
-      const totalAmount =
-        Math.round(
-          (totalLiters / 1000) *
-          BILL_RATE_PER_KL *
-          100
-        ) / 100;
-
-      // Calculate category-wise usage.
-      const categoryTotals = {};
-
-      usages.forEach((usage) => {
-        const category = usage.category || "Other";
-
-        categoryTotals[category] =
-          (categoryTotals[category] || 0) +
-          Number(usage.liters || 0);
-      });
-
-      const categoryBreakdown = Object.entries(
-        categoryTotals
-      ).map(([category, liters]) => ({
-        category,
-        liters
-      }));
-
-      const tariffBreakdown = [
-        {
-          slab: "Demo rate",
-          liters: totalLiters,
-          rate: BILL_RATE_PER_KL,
-          amount: totalAmount
-        }
-      ];
-
-      // Save a bill or update the bill for this month.
-      const bill = await Bill.findOneAndUpdate(
-        {
-          userId: req.session.userId,
-          billingMonth
-        },
-        {
-          $set: {
-            totalLiters,
-            totalAmount,
-            categoryBreakdown,
-            tariffBreakdown,
-            recordCount: usages.length
-          }
-        },
-        {
-          new: true,
-          upsert: true,
-          runValidators: true,
-          setDefaultsOnInsert: true
-        }
-      );
-
-      console.log(
-        `Bill saved: ${billingMonth}, ${totalLiters} litres`
-      );
-
-      return res.status(200).json({
-        message: "Bill generated and saved successfully.",
-        bill
-      });
-    } catch (error) {
-      console.error("Bill generation error:", error);
-
-      return res.status(500).json({
-        message: "Unable to generate bill. Check the server terminal."
+    if (
+      typeof billingMonth !== "string" ||
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(billingMonth)
+    ) {
+      return res.status(400).json({
+        message: "Please select a valid billing month."
       });
     }
+
+    const [year, month] = billingMonth.split("-").map(Number);
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    const usages = await Usage.find({
+      userId: req.session.userId,
+      date: {
+        $gte: startDate,
+        $lt: endDate
+      }
+    });
+
+    const totalLiters = usages.reduce(
+      (sum, usage) => sum + Number(usage.liters || 0),
+      0
+    );
+
+    const totalAmount =
+      Math.round(
+        (totalLiters / 1000) * BILL_RATE_PER_KL * 100
+      ) / 100;
+
+    const categoryTotals = {};
+
+    usages.forEach((usage) => {
+      const category = usage.category || "Other";
+
+      categoryTotals[category] =
+        (categoryTotals[category] || 0) +
+        Number(usage.liters || 0);
+    });
+
+    const categoryBreakdown = Object.entries(categoryTotals).map(
+      ([category, liters]) => ({
+        category,
+        liters
+      })
+    );
+
+    const tariffBreakdown = [
+      {
+        slab: "Demo rate",
+        liters: totalLiters,
+        rate: BILL_RATE_PER_KL,
+        amount: totalAmount
+      }
+    ];
+
+    const bill = await Bill.findOneAndUpdate(
+      {
+        userId: req.session.userId,
+        billingMonth
+      },
+      {
+        $set: {
+          totalLiters,
+          totalAmount,
+          categoryBreakdown,
+          tariffBreakdown,
+          recordCount: usages.length
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true
+      }
+    );
+
+    console.log(
+      `Bill saved: ${billingMonth}, ${totalLiters} litres`
+    );
+
+    res.status(200).json({
+      message: "Bill generated and saved successfully.",
+      bill
+    });
+  } catch (error) {
+    console.error("Bill generation error:", error);
+
+    res.status(500).json({
+      message: "Unable to generate bill. Check the server logs."
+    });
   }
-);
+});
 
 // ===============================
 // GET SAVED BILLS
@@ -497,8 +544,6 @@ app.get("/api/bills", requireLogin, async (req, res) => {
 
 // ===============================
 // UNKNOWN API ROUTES
-// Return JSON instead of an HTML 404 page.
-// Keep this after all API routes.
 // ===============================
 
 app.use("/api", (req, res) => {
@@ -513,11 +558,11 @@ app.use("/api", (req, res) => {
 
 async function startServer() {
   if (!process.env.MONGODB_URI) {
-    throw new Error("MONGODB_URI is missing from your .env file.");
+    throw new Error("MONGODB_URI is missing from Render environment variables.");
   }
 
   if (!process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET is missing from your .env file.");
+    throw new Error("SESSION_SECRET is missing from Render environment variables.");
   }
 
   await mongoose.connect(process.env.MONGODB_URI);
@@ -525,7 +570,7 @@ async function startServer() {
   console.log("MongoDB connected successfully.");
 
   app.listen(PORT, () => {
-    console.log(`AquaTrack server running at http://localhost:${PORT}`);
+    console.log(`AquaTrack server listening on port ${PORT}`);
   });
 }
 
