@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AquaTrack | Water Monitoring</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="auth-page">
+  <main class="auth-layout">
+    <section class="auth-visual">
+      <a class="brand" href="/">
+        <span class="brand-icon">◈</span> AquaTrack
+      </a>
+
+      <div class="visual-content">
+        <span class="eyebrow">SMART WATER. BETTER FUTURE.</span>
+        <h1>Every drop<br>has a <span>purpose.</span></h1>
+        <p>Understand your water habits, reduce waste, and make every litre count.</p>
+
+        <div class="water-art">
+          <div class="water-orbit orbit-one"></div>
+          <div class="water-orbit orbit-two"></div>
+          <div class="water-drop">💧</div>
+          <div class="floating-stat stat-one">↘ Save every drop</div>
+          <div class="floating-stat stat-two">◉ Smart analytics</div>
+        </div>
+      </div>
+
+      <p class="visual-footer">A more conscious way to use water.</p>
+    </section>
+
+    <section class="auth-form-area">
+      <div class="auth-card">
+        <div class="mobile-brand brand">
+          <span class="brand-icon">◈</span> AquaTrack
+        </div>
+
+        <div class="auth-heading">
+          <span class="eyebrow">YOUR PERSONAL WATER SPACE</span>
+          <h2 id="formTitle">Welcome back</h2>
+          <p id="formSubtitle">Sign in to see your water insights.</p>
+        </div>
+
+        <div class="auth-switch">
+          <button type="button" class="switch-btn active" id="loginTab">Sign in</button>
+          <button type="button" class="switch-btn" id="signupTab">Create account</button>
+        </div>
+
+        <form id="authForm">
+          <div class="field" id="nameField" hidden>
+            <label for="name">Full name</label>
+            <input id="name" name="name" type="text" placeholder="Your name" autocomplete="name">
+          </div>
+
+          <div class="field">
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email" required>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="password-wrap">
+              <input id="password" name="password" type="password" placeholder="At least 8 characters" minlength="8" maxlength="72" autocomplete="current-password" required>
+              <button type="button" id="togglePassword" class="password-toggle">Show</button>
+            </div>
+          </div>
+
+          <p class="form-message" id="authMessage" role="status"></p>
+          <button type="submit" class="primary-btn" id="submitBtn">Sign in <span>→</span></button>
+        </form>
+
+        <p class="auth-note">Use your account to access your personal water usage records.</p>
+      </div>
+    </section>
+  </main>
+  <script src="auth.js"></script>
+</body>
+</html>

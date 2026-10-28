@@ -1,0 +1,406 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>AquaTrack | Dashboard</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
+
+  <!-- Chart.js for dashboard charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- jsPDF for PDF bill generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body class="dashboard-page">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+
+    <a class="brand sidebar-brand" href="dashboard.html">
+      <span class="brand-icon">◈</span>
+      <span class="nav-label">AquaTrack</span>
+    </a>
+
+    <p class="nav-caption">WORKSPACE</p>
+
+    <nav class="side-nav">
+      <a class="nav-link active" href="#overview">
+        <span class="nav-icon">▦</span>
+        <span class="nav-label">Overview</span>
+      </a>
+
+      <a class="nav-link" href="#analytics">
+        <span class="nav-icon">◒</span>
+        <span class="nav-label">Analytics</span>
+      </a>
+
+      <a class="nav-link" href="#addUsage">
+        <span class="nav-icon">＋</span>
+        <span class="nav-label">Add usage</span>
+      </a>
+
+      <a class="nav-link" href="#history">
+        <span class="nav-icon">◷</span>
+        <span class="nav-label">History</span>
+      </a>
+
+      <a class="nav-link" href="#waterBill">
+        <span class="nav-icon">₹</span>
+        <span class="nav-label">Water Bill</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="water-tip">
+        <span class="tip-icon">💧</span>
+        <p class="nav-label">
+          <strong>Small steps matter</strong><br>
+          Every saved litre counts.
+        </p>
+      </div>
+
+      <button id="logoutBtn" class="nav-link logout-btn" type="button">
+        <span class="nav-icon">↪</span>
+        <span class="nav-label">Sign out</span>
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <button
+        id="menuBtn"
+        class="menu-btn"
+        type="button"
+        aria-label="Toggle sidebar"
+      >☰</button>
+
+      <div>
+        <p class="topbar-label">WATER MANAGEMENT / OVERVIEW</p>
+        <h1 id="welcomeTitle">Your water overview</h1>
+      </div>
+
+      <div class="profile-chip">
+        <span>●</span>
+        <span id="profileName">User</span>
+      </div>
+    </header>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+
+      <div class="welcome-banner">
+        <div>
+          <span class="eyebrow">YOUR DAILY IMPACT</span>
+          <h2>Make every drop count.</h2>
+          <p>
+            Track your habits today to build a more water-conscious tomorrow.
+          </p>
+        </div>
+
+        <div class="banner-drop">💧</div>
+      </div>
+
+      <div class="stats-grid">
+
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>Today's usage</span>
+            <span class="stat-symbol">◉</span>
+          </div>
+          <h2><span id="todayUsage">0</span> <small>L</small></h2>
+          <p>Water recorded today</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>This month</span>
+            <span class="stat-symbol">▦</span>
+          </div>
+          <h2><span id="monthUsage">0</span> <small>L</small></h2>
+          <p>Monthly consumption</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>Daily average</span>
+            <span class="stat-symbol">↗</span>
+          </div>
+          <h2><span id="averageUsage">0</span> <small>L</small></h2>
+          <p>Average over 7 days</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>Daily target left</span>
+            <span class="stat-symbol">◷</span>
+          </div>
+          <h2><span id="remainingUsage">200</span> <small>L</small></h2>
+          <p>Based on a 200 L target</p>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section id="analytics" class="charts-grid">
+
+      <article class="panel chart-panel chart-wide">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">CONSUMPTION</span>
+            <h3>Weekly water usage</h3>
+          </div>
+          <span class="chart-tag">Last 7 days</span>
+        </div>
+
+        <div class="chart-box">
+          <canvas id="weeklyChart"></canvas>
+        </div>
+      </article>
+
+      <article class="panel chart-panel">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">BREAKDOWN</span>
+            <h3>Usage by category</h3>
+          </div>
+        </div>
+
+        <div class="chart-box doughnut-box">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </article>
+
+      <article class="panel chart-panel chart-wide">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">YOUR TRENDS</span>
+            <h3>Daily consumption trend</h3>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- ADD WATER USAGE -->
+    <section id="addUsage" class="panel add-panel">
+
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">RECORD A NEW ACTIVITY</span>
+          <h3>Add water usage</h3>
+        </div>
+      </div>
+
+      <form id="usageForm" class="usage-form">
+
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category" required>
+            <option value="Bathing">Bathing</option>
+            <option value="Cooking">Cooking</option>
+            <option value="Washing">Washing</option>
+            <option value="Cleaning">Cleaning</option>
+            <option value="Gardening">Gardening</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="liters">Water used (litres)</label>
+          <input
+            id="liters"
+            type="number"
+            min="0.1"
+            max="100000"
+            step="any"
+            placeholder="e.g. 12.5"
+            required
+          >
+        </div>
+
+        <div class="field">
+          <label for="usageDate">Date</label>
+          <input id="usageDate" type="date" required>
+        </div>
+
+        <div class="field">
+          <label for="description">Description (optional)</label>
+          <input
+            id="description"
+            type="text"
+            maxlength="200"
+            placeholder="e.g. Morning bath"
+          >
+        </div>
+
+        <button class="primary-btn add-btn" type="submit">
+          Save record <span>＋</span>
+        </button>
+
+      </form>
+
+      <p id="usageMessage" class="form-message" role="status"></p>
+    </section>
+
+    <!-- WATER BILL GENERATION -->
+    <section id="waterBill" class="panel bill-section">
+
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">MONTHLY BILLING</span>
+          <h3>Water Bill Generation</h3>
+          <p>Calculate your bill using your saved water usage records.</p>
+        </div>
+      </div>
+
+      <div class="bill-form">
+        <div class="field">
+          <label for="billMonth">Select billing month</label>
+          <input type="month" id="billMonth" required>
+        </div>
+
+        <button
+          type="button"
+          id="generateBillBtn"
+          class="primary-btn"
+        >
+          Generate &amp; Save Bill
+        </button>
+      </div>
+
+      <p id="billMessage" class="form-message" role="status"></p>
+
+      <div id="billResult" class="bill-result" hidden>
+
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">BILL SUMMARY</span>
+            <h3>Monthly Water Bill</h3>
+          </div>
+        </div>
+
+        <div class="bill-details">
+          <p>Billing month: <strong id="billMonthText"></strong></p>
+          <p>Total water usage: <strong id="billLiters"></strong></p>
+          <p>Estimated bill amount: <strong id="billAmount"></strong></p>
+        </div>
+
+        <p class="bill-note">
+          Demo tariff: ₹10 per kilolitre (1 kilolitre = 1,000 litres).
+          This is a project estimate, not an official water bill.
+        </p>
+
+        <button
+          type="button"
+          id="printBillBtn"
+          class="secondary-btn"
+        >
+          Print / Download Bill
+        </button>
+
+      </div>
+    </section>
+
+    <!-- SAVED BILL HISTORY -->
+    <section id="billHistory" class="panel history-panel">
+
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">PREVIOUS BILLS</span>
+          <h3>Saved Bill History</h3>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Billing Month</th>
+              <th>Total Usage</th>
+              <th>Bill Amount</th>
+            </tr>
+          </thead>
+
+          <tbody id="savedBillsBody">
+            <tr>
+              <td colspan="3">Loading bills...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- WATER USAGE HISTORY -->
+    <section id="history" class="panel history-panel">
+
+      <div class="panel-heading">
+        <div>
+          <span class="eyebrow">YOUR RECORDS</span>
+          <h3>Recent water usage</h3>
+        </div>
+
+        <button
+          id="refreshBtn"
+          class="secondary-btn"
+          type="button"
+        >
+          Refresh ↻
+        </button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Litres</th>
+              <th>Description</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+
+          <tbody id="historyBody">
+            <tr>
+              <td colspan="5">Loading records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="page-footer">
+      AquaTrack · Use wisely. Save sustainably.
+    </footer>
+
+  </main>
+
+  <!-- Load dashboard JavaScript only once, after HTML elements -->
+  <script src="dashboard.js"></script>
+
+</body>
+</html>
+```
